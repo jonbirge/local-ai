@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "searxng": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-searxng"
+      ],
+      "env": {
+        "SEARXNG_URL": "http://searxng:8080"
+      }
+    },
+    "searxng-xuv": {
+      "command": "uvx",
+      "args": [
+        "mcp-searxng"
+      ],
+      "env": {
+        "SEARXNG_URL": "http://searxng:8080"
+      }
+    },
+    "time": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-time",
+        "--local-timezone=America/New_York"
+      ]
+    }
+  }
+}

@@ -1,0 +1,128 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"                 # make publicly available on host
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      # The following two are optional when using `gpus: all`, but harmless:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Keep models warm for interactive use (default ~5m). Tweak to taste:
+      - OLLAMA_KEEP_ALIVE=10m
+    volumes:
+      - ./ollama:/root/.ollama        # models + state (lives on your Windows filesystem)
+    gpus: all  # <-- enable NVIDIA GPU in Compose
+    restart: unless-stopped
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    depends_on:
+      - ollama
+      - searxng
+      - mcpo
+    #  - mcpo-time
+    ports:
+      - "3000:8080"                   # Web UI: http://localhost:3000
+    environment:
+      # Set to false or comment to disable persistent config to reset to defaults
+      - ENABLE_PERSISTENT_CONFIG=true
+      # Authentication and user management
+      - WEBUI_AUTH=true
+      - ENABLE_SIGNUP=true
+      - SINGLE_USER_MODE=false
+      - DEFAULT_USER_ROLE=pending
+      - ENABLE_LOGIN_FORM=true
+      - ENABLE_SIGNUP_PASSWORD_CONFIRMATION=true
+      - DEFAULT_ADMIN_USERNAME=${WEBUI_ADMIN_USER}
+      - DEFAULT_ADMIN_PASSWORD=${WEBUI_ADMIN_PASS}
+      - WEBUI_NAME="Birge WebUI"
+      # Ollama backend connection
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OPENAI_API_BASE=http://ollama:11434/v1
+      - OPENAI_API_KEY=dummy
+      # Make this the default visible model in the selector on first launch (optional)
+      - DEFAULT_MODELS=llama3.1:8b
+      # Tool servers
+      - ENABLE_DIRECT_CONNECTIONS=false
+      - TOOL_SERVER_CONNECTIONS=[
+          {
+            "url":"http://mcpo-time:8001",
+            "path":"/openapi.json",
+            "auth_type":"none",
+            "key":"",
+            "config":{},
+            "info":{
+              "name":"mcp-time",
+              "description":"MCP time server via mcpo"
+            }
+          }
+        ]
+      # Enable Web Search and select SearXNG
+      - ENABLE_WEB_SEARCH=true
+      - ENABLE_SEARCH_QUERY_GENERATION=true
+      - WEB_SEARCH_ENGINE=searxng
+      - WEB_SEARCH_RESULT_COUNT=3
+      - WEB_SEARCH_CONCURRENT_REQUESTS=7
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
+      # Recommended (persisted config): set to your public/base URL if you’ll use integrations
+      - WEBUI_URL=http://localhost:3000
+      # Admin details
+      - SHOW_ADMIN_DETAILS=true
+      - ADMIN_EMAIL=admin@localhost
+      # Other settings
+      - USE_CUDA_DOCKER=true
+    volumes:
+      - ./openwebui:/app/backend/data
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8080:8080"                   # SearXNG web interface: http://localhost:8080
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - UWSGI_WORKERS=2
+    volumes:
+      - ./searxng:/etc/searxng/        # persist config (matches: -v "./config/:/etc/searxng/")
+    restart: unless-stopped
+
+  # mcpo-time:
+  #   image: ghcr.io/open-webui/mcpo:main
+  #   container_name: mcpo-time                # MCP time server
+  #   command: [
+  #     "mcpo","--host","0.0.0.0",
+  #     "--port","8001",
+  #     "--",
+  #     "uvx","mcp-server-time",
+  #     "--local-timezone=America/New_York"
+  #   ]
+  #   restart: unless-stopped
+
+  mcpo:
+    image: ghcr.io/open-webui/mcpo:main
+    container_name: mcpo
+    ports:
+      - "8001:8001"                 # MCPo default port mapping (optional)
+    restart: unless-stopped
+    depends_on:
+      - searxng
+    volumes:
+      - ./mcpo/config.json:/config/config.json:ro
+    command:
+      [
+        "--config", "/config/config.json",
+        "--hot-reload",
+        "--port", "8001"
+      ]
+
+  # watchtower:
+  #   image: containrrr/watchtower:latest
+  #   container_name: watchtower
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --cleanup --interval 900
+  #   restart: unless-stopped
