@@ -2,8 +2,8 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    ports:
-      - "11434:11434"                 # make publicly available on host
+    # ports:
+    #   - "11434:11434"                 # make publicly available on host
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
       # The following two are optional when using `gpus: all`, but harmless:
@@ -47,19 +47,6 @@ services:
       - DEFAULT_MODELS=llama3.1:8b
       # Tool servers
       - ENABLE_DIRECT_CONNECTIONS=false
-      - TOOL_SERVER_CONNECTIONS=[
-          {
-            "url":"http://mcpo-time:8001",
-            "path":"/openapi.json",
-            "auth_type":"none",
-            "key":"",
-            "config":{},
-            "info":{
-              "name":"mcp-time",
-              "description":"MCP time server via mcpo"
-            }
-          }
-        ]
       # Enable Web Search and select SearXNG
       - ENABLE_WEB_SEARCH=true
       - ENABLE_SEARCH_QUERY_GENERATION=true
@@ -68,7 +55,7 @@ services:
       - WEB_SEARCH_CONCURRENT_REQUESTS=7
       - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
       # Recommended (persisted config): set to your public/base URL if you’ll use integrations
-      - WEBUI_URL=http://localhost:3000
+      - WEBUI_URL=http://192.168.7.48:3000
       # Admin details
       - SHOW_ADMIN_DETAILS=true
       - ADMIN_EMAIL=admin@localhost
